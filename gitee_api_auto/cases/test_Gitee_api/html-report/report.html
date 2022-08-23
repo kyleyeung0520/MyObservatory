@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <style>body {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  /* do not increase min-width as some may use split screens */
+  min-width: 800px;
+  color: #999;
+}
+
+h1 {
+  font-size: 24px;
+  color: black;
+}
+
+h2 {
+  font-size: 16px;
+  color: black;
+}
+
+p {
+  color: black;
+}
+
+a {
+  color: #999;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+/******************************
+ * SUMMARY INFORMATION
+ ******************************/
+#environment td {
+  padding: 5px;
+  border: 1px solid #E6E6E6;
+}
+#environment tr:nth-child(odd) {
+  background-color: #f6f6f6;
+}
+
+/******************************
+ * TEST RESULT COLORS
+ ******************************/
+span.passed,
+.passed .col-result {
+  color: green;
+}
+
+span.skipped,
+span.xfailed,
+span.rerun,
+.skipped .col-result,
+.xfailed .col-result,
+.rerun .col-result {
+  color: orange;
+}
+
+span.error,
+span.failed,
+span.xpassed,
+.error .col-result,
+.failed .col-result,
+.xpassed .col-result {
+  color: red;
+}
+
+/******************************
+ * RESULTS TABLE
+ *
+ * 1. Table Layout
+ * 2. Extra
+ * 3. Sorting items
+ *
+ ******************************/
+/*------------------
+ * 1. Table Layout
+ *------------------*/
+#results-table {
+  border: 1px solid #e6e6e6;
+  color: #999;
+  font-size: 12px;
+  width: 100%;
+}
+#results-table th,
+#results-table td {
+  padding: 5px;
+  border: 1px solid #E6E6E6;
+  text-align: left;
+}
+#results-table th {
+  font-weight: bold;
+}
+
+/*------------------
+ * 2. Extra
+ *------------------*/
+.log {
+  background-color: #e6e6e6;
+  border: 1px solid #e6e6e6;
+  color: black;
+  display: block;
+  font-family: "Courier New", Courier, monospace;
+  height: 230px;
+  overflow-y: scroll;
+  padding: 5px;
+  white-space: pre-wrap;
+}
+.log:only-child {
+  height: inherit;
+}
+
+div.image {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin-left: 5px;
+  overflow: hidden;
+  width: 320px;
+}
+div.image img {
+  width: 320px;
+}
+
+div.video {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin-left: 5px;
+  overflow: hidden;
+  width: 320px;
+}
+div.video video {
+  overflow: hidden;
+  width: 320px;
+  height: 240px;
+}
+
+.collapsed {
+  display: none;
+}
+
+.expander::after {
+  content: " (show details)";
+  color: #BBB;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.collapser::after {
+  content: " (hide details)";
+  color: #BBB;
+  font-style: italic;
+  cursor: pointer;
+}
+
+/*------------------
+ * 3. Sorting items
+ *------------------*/
+.sortable {
+  cursor: pointer;
+}
+
+.sort-icon {
+  font-size: 0px;
+  float: left;
+  margin-right: 5px;
+  margin-top: 5px;
+  /*triangle*/
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+}
+.inactive .sort-icon {
+  /*finish triangle*/
+  border-top: 8px solid #E6E6E6;
+}
+.asc.active .sort-icon {
+  /*finish triangle*/
+  border-bottom: 8px solid #999;
+}
+.desc.active .sort-icon {
+  /*finish triangle*/
+  border-top: 8px solid #999;
+}
+</style></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++)
+        filterItems[i].hidden = false;
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 23-Aug-2022 at 00:20:55 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>JAVA_HOME</td>
+        <td>D:\Program Files\Java\jdk1.8.0_221</td></tr>
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "1.0.0", "py": "1.11.0", "pytest": "7.1.1"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-10-10.0.19041-SP0</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"allure-pytest": "2.9.45", "assume": "2.4.3", "bdd": "5.0.0", "dependency": "0.5.1", "forked": "1.4.0", "html": "3.1.1", "instafail": "0.4.2", "metadata": "2.0.1", "ordering": "0.6", "repeat": "0.9.1", "rerunfailures": "10.2", "runfailed": "0.6", "spec": "3.2.0", "sugar": "0.9.4", "timeout": "2.1.0", "xdist": "2.5.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.7.2rc1</td></tr></table>
+    <h2>Summary</h2>
+    <p>5 tests ran in 6.62 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">5 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>, <input checked="true" class="filter" data-test-result="rerun" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="rerun">0 rerun</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable description" col="description">用例名称</th>
+          <th class="sortable time" col="time">测试时间</th>
+          <th class="sortable" col="duration">Duration</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="5">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_Gitee_api/test_gitee_apitest.py::TestControl::test_Gitee_login[&quot;errmsg&quot;:&quot;æå&quot;]</td>
+          <td class="col-description">获取登录token</td>
+          <td class="col-time">2022-08-23 00:20:49</td>
+          <td class="col-duration">0.72</td></tr>
+        <tr>
+          <td class="extra" colspan="5">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/># ########################################################
+# 请求相关数据开始打印
+# 请求的url和参数和headers如下：
+https://litemall.hogwarts.ceshiren.com/wx/auth/login
+参数： {&#x27;username&#x27;: &#x27;gitee&#x27;, &#x27;password&#x27;: &#x27;qwer1234&#x27;}
+headers： {&#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;}
+# 请求相关数据打印完毕
+# ########################################################
+{&quot;errno&quot;:0,&quot;data&quot;:{&quot;userInfo&quot;:{&quot;nickName&quot;:&quot;gitee&quot;,&quot;avatarUrl&quot;:&quot;https://yanxuan.nosdn.127.net/80841d741d7fa3073e0ae27bf487339f.jpg?imageView&amp;quality=90&amp;thumbnail=64x64&quot;},&quot;token&quot;:&quot;eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0aGlzIGlzIGxpdGVtYWxsIHRva2VuIiwiYXVkIjoiTUlOSUFQUCIsImlzcyI6IkxJVEVNQUxMIiwiZXhwIjoxNjYxMTkyNDQyLCJ1c2VySWQiOjM0LCJpYXQiOjE2NjExODUyNDJ9.-mYSRxsQ5tITSOzVKvM9xRBkJTC1xaxXl-VcQG26mvs&quot;},&quot;errmsg&quot;:&quot;成功&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_Gitee_api/test_gitee_apitest.py::TestControl::test_Gitee_GoodsSearch[&quot;name&quot;:&quot;3Dçº¯æ£æ¤é¢å ç¿¼è®°å¿æ&quot;]</td>
+          <td class="col-description">商品搜索</td>
+          <td class="col-time">2022-08-23 00:20:50</td>
+          <td class="col-duration">0.81</td></tr>
+        <tr>
+          <td class="extra" colspan="5">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/># ########################################################
+# 请求相关数据开始打印
+# 请求的url和参数和headers如下：
+https://litemall.hogwarts.ceshiren.com/wx/goods/list?
+参数： {&#x27;keyword&#x27;: &#x27;3D&#x27;, &#x27;page&#x27;: 1, &#x27;limit&#x27;: 10}
+headers： {&#x27;X-Litemall-Token&#x27;: &#x27;eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0aGlzIGlzIGxpdGVtYWxsIHRva2VuIiwiYXVkIjoiTUlOSUFQUCIsImlzcyI6IkxJVEVNQUxMIiwiZXhwIjoxNjYxMTkyNDQyLCJ1c2VySWQiOjM0LCJpYXQiOjE2NjExODUyNDJ9.-mYSRxsQ5tITSOzVKvM9xRBkJTC1xaxXl-VcQG26mvs&#x27;}
+# 请求相关数据打印完毕
+# ########################################################
+{&quot;errno&quot;:0,&quot;data&quot;:{&quot;total&quot;:2,&quot;pages&quot;:1,&quot;limit&quot;:10,&quot;page&quot;:1,&quot;list&quot;:[{&quot;id&quot;:1064006,&quot;name&quot;:&quot;3D纯棉护颈加翼记忆枕&quot;,&quot;brief&quot;:&quot;深色面料，安睡护颈&quot;,&quot;picUrl&quot;:&quot;http://yanxuan.nosdn.127.net/35306b8e65932dd28a5628d0bb44a044.png&quot;,&quot;isNew&quot;:false,&quot;isHot&quot;:false,&quot;counterPrice&quot;:149.00,&quot;retailPrice&quot;:129.00},{&quot;id&quot;:1064007,&quot;name&quot;:&quot;3D纯棉护颈双人记忆枕&quot;,&quot;brief&quot;:&quot;纯棉呵护，属于你我的记忆&quot;,&quot;picUrl&quot;:&quot;http://yanxuan.nosdn.127.net/d7bd87f8cc1965b25be33a8aad53812b.png&quot;,&quot;isNew&quot;:false,&quot;isHot&quot;:false,&quot;counterPrice&quot;:269.00,&quot;retailPrice&quot;:249.00}],&quot;filterCategoryList&quot;:[{&quot;id&quot;:1008008,&quot;name&quot;:&quot;被枕&quot;,&quot;keywords&quot;:&quot;&quot;,&quot;desc&quot;:&quot;守护你的睡眠时光&quot;,&quot;pid&quot;:1005000,&quot;iconUrl&quot;:&quot;http://yanxuan.nosdn.127.net/927bc33f7ae2895dd6c11cf91f5e3228.png&quot;,&quot;picUrl&quot;:&quot;http://yanxuan.nosdn.127.net/b43ef7cececebe6292d2f7f590522e05.png&quot;,&quot;level&quot;:&quot;L2&quot;,&quot;sortOrder&quot;:2,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false}]},&quot;errmsg&quot;:&quot;成功&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_Gitee_api/test_gitee_apitest.py::TestControl::test_Gitee_GoodsDetails[&quot;goodsId&quot;:1064006]</td>
+          <td class="col-description">获取商品详情</td>
+          <td class="col-time">2022-08-23 00:20:51</td>
+          <td class="col-duration">0.80</td></tr>
+        <tr>
+          <td class="extra" colspan="5">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/># ########################################################
+# 请求相关数据开始打印
+# 请求的url和参数和headers如下：
+https://litemall.hogwarts.ceshiren.com/wx/goods/detail
+参数： {&#x27;id&#x27;: 1064006}
+headers： {&#x27;X-Litemall-Token&#x27;: &#x27;eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0aGlzIGlzIGxpdGVtYWxsIHRva2VuIiwiYXVkIjoiTUlOSUFQUCIsImlzcyI6IkxJVEVNQUxMIiwiZXhwIjoxNjYxMTkyNDQyLCJ1c2VySWQiOjM0LCJpYXQiOjE2NjExODUyNDJ9.-mYSRxsQ5tITSOzVKvM9xRBkJTC1xaxXl-VcQG26mvs&#x27;}
+# 请求相关数据打印完毕
+# ########################################################
+{&quot;errno&quot;:0,&quot;data&quot;:{&quot;specificationList&quot;:[{&quot;name&quot;:&quot;规格&quot;,&quot;valueList&quot;:[{&quot;id&quot;:75,&quot;goodsId&quot;:1064006,&quot;specification&quot;:&quot;规格&quot;,&quot;value&quot;:&quot;标准&quot;,&quot;picUrl&quot;:&quot;&quot;,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false}]}],&quot;groupon&quot;:[],&quot;issue&quot;:[{&quot;id&quot;:1,&quot;question&quot;:&quot;购买运费如何收取？&quot;,&quot;answer&quot;:&quot;单笔订单金额（不含运费）满88元免邮费；不满88元，每单收取10元运费。\n(港澳台地区需满&quot;,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false},{&quot;id&quot;:2,&quot;question&quot;:&quot;使用什么快递发货？&quot;,&quot;answer&quot;:&quot;严选默认使用顺丰快递发货（个别商品使用其他快递），配送范围覆盖全国大部分地区（港澳台地区除&quot;,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false},{&quot;id&quot;:3,&quot;question&quot;:&quot;如何申请退货？&quot;,&quot;answer&quot;:&quot;1.自收到商品之日起30日内，顾客可申请无忧退货，退款将原路返还，不同的银行处理时间不同，&quot;,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false},{&quot;id&quot;:4,&quot;question&quot;:&quot;如何开具发票？&quot;,&quot;answer&quot;:&quot;1.如需开具普通发票，请在下单时选择“我要开发票”并填写相关信息（APP仅限2.4.0及以&quot;,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false}],&quot;userHasCollect&quot;:0,&quot;shareImage&quot;:&quot;&quot;,&quot;comment&quot;:{&quot;data&quot;:[],&quot;count&quot;:0},&quot;share&quot;:false,&quot;attribute&quot;:[{&quot;id&quot;:283,&quot;goodsId&quot;:1064006,&quot;attribute&quot;:&quot;尺寸&quot;,&quot;value&quot;:&quot;50x30x10-6cm&quot;,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false},{&quot;id&quot;:284,&quot;goodsId&quot;:1064006,&quot;attribute&quot;:&quot;重量&quot;,&quot;value&quot;:&quot;0.87kg&quot;,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false},{&quot;id&quot;:285,&quot;goodsId&quot;:1064006,&quot;attribute&quot;:&quot;外层面料&quot;,&quot;value&quot;:&quot;40%棉60%聚酯纤维（接触皮肤面全棉）&quot;,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false},{&quot;id&quot;:286,&quot;goodsId&quot;:1064006,&quot;attribute&quot;:&quot;里层面料&quot;,&quot;value&quot;:&quot;100%聚酯纤维&quot;,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false},{&quot;id&quot;:287,&quot;goodsId&quot;:1064006,&quot;attribute&quot;:&quot;内芯&quot;,&quot;value&quot;:&quot;聚氨酯&quot;,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false}],&quot;brand&quot;:{},&quot;productList&quot;:[{&quot;id&quot;:76,&quot;goodsId&quot;:1064006,&quot;specifications&quot;:[&quot;标准&quot;],&quot;price&quot;:129.00,&quot;number&quot;:100,&quot;url&quot;:&quot;http://yanxuan.nosdn.127.net/35306b8e65932dd28a5628d0bb44a044.png&quot;,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false}],&quot;info&quot;:{&quot;id&quot;:1064006,&quot;goodsSn&quot;:&quot;1064006&quot;,&quot;name&quot;:&quot;3D纯棉护颈加翼记忆枕&quot;,&quot;categoryId&quot;:1008008,&quot;brandId&quot;:0,&quot;gallery&quot;:[&quot;http://yanxuan.nosdn.127.net/d129f712c8aac8835695f61980c621c0.jpg&quot;,&quot;http://yanxuan.nosdn.127.net/b4b6641252b78dbcf1572a8995f9666d.jpg&quot;,&quot;http://yanxuan.nosdn.127.net/11d466acd868271a6b6c04aa80013232.jpg&quot;,&quot;http://yanxuan.nosdn.127.net/a40d02a081b575d8d01808aab3eb2720.jpg&quot;],&quot;keywords&quot;:&quot;&quot;,&quot;brief&quot;:&quot;深色面料，安睡护颈&quot;,&quot;isOnSale&quot;:true,&quot;sortOrder&quot;:11,&quot;picUrl&quot;:&quot;http://yanxuan.nosdn.127.net/35306b8e65932dd28a5628d0bb44a044.png&quot;,&quot;shareUrl&quot;:&quot;&quot;,&quot;isNew&quot;:false,&quot;isHot&quot;:false,&quot;unit&quot;:&quot;件&quot;,&quot;counterPrice&quot;:149.00,&quot;retailPrice&quot;:129.00,&quot;addTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;updateTime&quot;:&quot;2018-01-31 16:00:00&quot;,&quot;deleted&quot;:false,&quot;detail&quot;:&quot;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/5ea4edcd9cbd70f9d347a0191f5ac1e2.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/5ea4edcd9cbd70f9d347a0191f5ac1e2.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/5ffee41deb5a0b0017d5ac3f7feda520.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/5ffee41deb5a0b0017d5ac3f7feda520.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/4fa38f7a466b792826d03a7fc094b205.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/4fa38f7a466b792826d03a7fc094b205.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/4dc78b172a7818190aee72bf7c5a55c9.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/4dc78b172a7818190aee72bf7c5a55c9.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/086e2994f14897353fa9413f886e88f9.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/086e2994f14897353fa9413f886e88f9.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/e46cdebba21e08125e9317c32679ff9f.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/e46cdebba21e08125e9317c32679ff9f.jpg\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/86ebedb440da6e2af676554c39bfd653.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/86ebedb440da6e2af676554c39bfd653.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/5b6728641afdc97f2fbb50c2b886c355.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/5b6728641afdc97f2fbb50c2b886c355.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/a20cb1abd9e46768d63c0a03e780b921.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/a20cb1abd9e46768d63c0a03e780b921.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/974d424a27d3502b203e66ad5b708e62.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/974d424a27d3502b203e66ad5b708e62.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/2c2df5c9e231ed917745ab770afe668d.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/2c2df5c9e231ed917745ab770afe668d.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/dc6ac3894803fe0030141852bd639558.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/dc6ac3894803fe0030141852bd639558.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/aaedff798dfbe28754bad944434ef654.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/aaedff798dfbe28754bad944434ef654.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/d68bb36c8d47486b64e1551540887da7.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/d68bb36c8d47486b64e1551540887da7.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/35a5871cbc972b340191c6f558f4eb5d.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/35a5871cbc972b340191c6f558f4eb5d.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/7256ce7e7549fa545d8088e88cb9a200.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/7256ce7e7549fa545d8088e88cb9a200.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/843e2e7ffd5d80ee3a714df546e5d76b.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/843e2e7ffd5d80ee3a714df546e5d76b.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/cc7115f361220617b7d66be8a76346cc.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/cc7115f361220617b7d66be8a76346cc.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/876075252dfc043c15a86e6d2415b4c9.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/876075252dfc043c15a86e6d2415b4c9.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/0cf1cdc2efd85cb5934515ad68975300.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/0cf1cdc2efd85cb5934515ad68975300.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/df538abb58fb3ff667f919f9688e68c0.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/df538abb58fb3ff667f919f9688e68c0.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/e85c449ea1794d6925af9187e1dde6d0.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/e85c449ea1794d6925af9187e1dde6d0.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/7c628d454aba737cd8fbd5bb52bb41a0.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/7c628d454aba737cd8fbd5bb52bb41a0.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/1e3b34066432dd830d7dea59f5172622.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/1e3b34066432dd830d7dea59f5172622.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/8edc3903956456e4fbbd6844d1843079.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/8edc3903956456e4fbbd6844d1843079.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/8ae7b238aa8be68f915b27c064fc1234.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/8ae7b238aa8be68f915b27c064fc1234.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/a7d59a45d54cbeb7fd3d4e3a9f6f20de.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/a7d59a45d54cbeb7fd3d4e3a9f6f20de.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/060287eacf5855100691a931615753a6.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/060287eacf5855100691a931615753a6.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/154e9d3945f092141030f9e0ffe00d75.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/154e9d3945f092141030f9e0ffe00d75.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/538caa5366b10fce92532c4094be7b41.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/538caa5366b10fce92532c4094be7b41.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/e08d88f1f11877e188f63d9abe319e50.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/e08d88f1f11877e188f63d9abe319e50.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/a8b31045cb0c2627f7f31bd6b0900482.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/a8b31045cb0c2627f7f31bd6b0900482.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;img src=\&quot;http://yanxuan.nosdn.127.net/33e654f6e06a9b39982f73ce9fbffecd.jpg\&quot; _src=\&quot;http://yanxuan.nosdn.127.net/33e654f6e06a9b39982f73ce9fbffecd.jpg\&quot; style=\&quot;\&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&quot;}},&quot;errmsg&quot;:&quot;成功&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_Gitee_api/test_gitee_apitest.py::TestControl::test_Gitee_GoodsAdd[&quot;errmsg&quot;:&quot;æå&quot;]</td>
+          <td class="col-description">添加商品到购物车</td>
+          <td class="col-time">2022-08-23 00:20:52</td>
+          <td class="col-duration">0.58</td></tr>
+        <tr>
+          <td class="extra" colspan="5">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/># ########################################################
+# 请求相关数据开始打印
+# 请求的url和参数和headers如下：
+https://litemall.hogwarts.ceshiren.com/wx/cart/add
+参数： {&#x27;goodsId&#x27;: 1064006, &#x27;number&#x27;: 1, &#x27;productId&#x27;: 76}
+headers： {&#x27;X-Litemall-Token&#x27;: &#x27;eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0aGlzIGlzIGxpdGVtYWxsIHRva2VuIiwiYXVkIjoiTUlOSUFQUCIsImlzcyI6IkxJVEVNQUxMIiwiZXhwIjoxNjYxMTkyNDQyLCJ1c2VySWQiOjM0LCJpYXQiOjE2NjExODUyNDJ9.-mYSRxsQ5tITSOzVKvM9xRBkJTC1xaxXl-VcQG26mvs&#x27;}
+# 请求相关数据打印完毕
+# ########################################################
+{&quot;errno&quot;:0,&quot;data&quot;:19,&quot;errmsg&quot;:&quot;成功&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_Gitee_api/test_gitee_apitest.py::TestControl::test_Gitee_GoodsCart[&quot;goodsName&quot;:&quot;3Dçº¯æ£æ¤é¢å ç¿¼è®°å¿æ&quot;]</td>
+          <td class="col-description">获取购物车列表接口</td>
+          <td class="col-time">2022-08-23 00:20:55</td>
+          <td class="col-duration">3.46</td></tr>
+        <tr>
+          <td class="extra" colspan="5">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/># ########################################################
+# 请求相关数据开始打印
+# 请求的url和参数和headers如下：
+https://litemall.hogwarts.ceshiren.com/wx/cart/index
+headers： {&#x27;X-Litemall-Token&#x27;: &#x27;eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0aGlzIGlzIGxpdGVtYWxsIHRva2VuIiwiYXVkIjoiTUlOSUFQUCIsImlzcyI6IkxJVEVNQUxMIiwiZXhwIjoxNjYxMTkyNDQyLCJ1c2VySWQiOjM0LCJpYXQiOjE2NjExODUyNDJ9.-mYSRxsQ5tITSOzVKvM9xRBkJTC1xaxXl-VcQG26mvs&#x27;}
+# 请求相关数据打印完毕
+# ########################################################
+{&quot;errno&quot;:0,&quot;data&quot;:{&quot;cartTotal&quot;:{&quot;goodsCount&quot;:19,&quot;checkedGoodsCount&quot;:19,&quot;goodsAmount&quot;:2451.00,&quot;checkedGoodsAmount&quot;:2451.00},&quot;cartList&quot;:[{&quot;id&quot;:501,&quot;userId&quot;:34,&quot;goodsId&quot;:1064006,&quot;goodsSn&quot;:&quot;1064006&quot;,&quot;goodsName&quot;:&quot;3D纯棉护颈加翼记忆枕&quot;,&quot;productId&quot;:76,&quot;price&quot;:129.00,&quot;number&quot;:19,&quot;specifications&quot;:[&quot;标准&quot;],&quot;checked&quot;:true,&quot;picUrl&quot;:&quot;http://yanxuan.nosdn.127.net/35306b8e65932dd28a5628d0bb44a044.png&quot;,&quot;addTime&quot;:&quot;2022-08-15 15:43:01&quot;,&quot;updateTime&quot;:&quot;2022-08-22 16:20:45&quot;,&quot;deleted&quot;:false}]},&quot;errmsg&quot;:&quot;成功&quot;}
+<br/></div></td></tr></tbody></table></body></html>
